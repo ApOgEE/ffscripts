@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+
+# Author: M. Fauzilkamil Zainuddin <apogee@apogeek.com>
+
+import subprocess
+import re
+import math
+from optparse import OptionParser
+
+
+def utama():
+    (namafail, saiz_split_saat) = parse_options()
+    if saiz_split_saat <= 0:
+        print("Split length can't be 0")
+        raise SystemExit
+    hasil = subprocess.Popen("ffprobe -i '"+namafail+"' 2>&1 | grep 'Duration'",
+                              shell = True,
+                              stdout = subprocess.PIPE
+    ).stdout.read()
+
+    regexp_saiz = 'Duration: (\d{2}):(\d{2}):(\d{2})\.\d+,'
+    re_saiz = re.compile(regexp_saiz)
+    jumpa = re_saiz.search(str(hasil))
+    if jumpa:
+        panjang_video = int(jumpa.group(1)) * 3600 + \
+                        int(jumpa.group(2)) * 60 + \
+                        int(jumpa.group(3))
+        print("Video length in seconds: "+str(panjang_video))
+    else:
+        print("Cannot determine video length.")
+        raise SystemExit
+
+    jumlah_split = int(math.ceil(panjang_video/float(saiz_split_saat)))
+
+    if(jumlah_split == 1):
+        print("Video length is less then the target split length.")
+        raise SystemExit
+
+    print("Splitting video into "+str(jumlah_split)+" parts")
+
+    fail_nak_split = " -i '"+namafail+"' -c copy "
+    for n in range(0, jumlah_split):
+        arahan_split = ""
+        if n == 0:
+            split_mula = 0
+            arahan_split = "ffmpeg -ss "+str(split_mula)+" -t "+str(saiz_split_saat) + \
+                        str(fail_nak_split)+" '"+namafail[:-4] + "-" + str(n) + "." + namafail[-3:] + "'"
+        else:
+            split_mula = saiz_split_saat * n
+            arahan_split = "ffmpeg -ss "+str(split_mula)+" -t "+str(saiz_split_saat) + \
+                        str(fail_nak_split)+" '"+namafail[:-4] + "-" + str(n) + "." + namafail[-3:] + "'"
+
+        print("About to run: "+arahan_split)
+        hasil = subprocess.Popen(arahan_split, shell = True, stdout =
+                                  subprocess.PIPE).stdout.read()
+
+
+def parse_options():
+    parser = OptionParser()
+    parser.add_option("-f", "--file",
+                      dest = "namafail",
+                      help = "file to split, for example my_video.mp4",
+                      type = "string",
+                      action = "store"
+    )
+    parser.add_option("-s", "--split-size",
+                      dest = "saiz_split_saat",
+                      help = "split or chunk size in seconds, for example 10",
+                      type = "int",
+                      action = "store"
+    )
+    (options, args) = parser.parse_args()
+    if options.namafail and options.saiz_split_saat:
+        return (options.namafail, options.saiz_split_saat)
+    else:
+        parser.print_help()
+        raise SystemExit
+
+if __name__ == '__main__':
+    try:
+        utama()
+    except Exception as e:
+        print ("Exception occured running utama():")
+        print (str(e))
